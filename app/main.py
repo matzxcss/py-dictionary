@@ -46,10 +46,6 @@ class Dictionary:
                         self.hash_table[index] = node
                         break
                     index = (index + 1) % self.capacity
-            elif node is self._TOMBSTONE:
-                continue
-            else:
-                raise RuntimeError("Hash table contains invalid data")
 
     def __setitem__(self, key: Hashable, value: Any) -> None:
         key_hash = hash(key)
@@ -67,12 +63,10 @@ class Dictionary:
     def __getitem__(self, key: Hashable) -> Any:
         key_hash = hash(key)
         index = self._find_slot(key, key_hash)
-        if isinstance(self.hash_table[index], self._Node):
-            return self.hash_table[index].value
-        elif self.hash_table[index] is self._TOMBSTONE:
-            raise KeyError(f"Key not found: {key}")
-        else:
-            raise RuntimeError("Hash table contains invalid data")
+        node = self.hash_table[index]
+        if isinstance(node, self._Node) and node.key == key:
+            return node.value
+        raise KeyError(f"Key not found: {key}")
 
     def __len__(self) -> int:
         return self.length
