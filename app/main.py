@@ -1,27 +1,29 @@
+from typing import Any, Hashable, Iterator
+
+
 class Dictionary:
     class _Node:
-        def __init__(self, key: str, hash_value: int, value: str) -> None:
+        def __init__(self, key: Hashable, hash_value: int, value: Any) -> None:
             self.key = key
             self.hash = hash_value
             self.value = value
 
+    class _Tombstone:
+        pass
+
     def __init__(self) -> None:
         self.capacity = 8
         self.length = 0
-        self.hash_table = [None] * self.capacity
+        self.hash_table: list = [None] * self.capacity
         self.load_factor = 0.75
 
-    def _hash_index(self, key: str) -> tuple[int, int]:
-        key_hash = hash(key)
-        index = key_hash % self.capacity
-        return index, key_hash
-
-    def _find_slot(self, key: str, key_hash: int) -> int:
+    def _find_slot(self, key: Hashable, key_hash: int) -> int:
         index = key_hash % self.capacity
         start_index = index
         while self.hash_table[index] is not None:
             if (
-                self.hash_table[index].key == key
+                isinstance(self.hash_table[index], self._Node)
+                and self.hash_table[index].key == key
                 and self.hash_table[index].hash == key_hash
             ):
                 return index
@@ -35,16 +37,16 @@ class Dictionary:
         self.capacity *= 2
         self.hash_table = [None] * self.capacity
         for node in old_table:
-            if node is not None:
+            if isinstance(node, self._Node):
                 index = node.hash % self.capacity
                 while self.hash_table[index] is not None:
                     index = (index + 1) % self.capacity
                 self.hash_table[index] = node
 
-    def __setitem__(self, key: str, value: str) -> None:
+    def __setitem__(self, key: Hashable, value: Any) -> None:
         key_hash = hash(key)
         index = self._find_slot(key, key_hash)
-        if self.hash_table[index] is not None:
+        if isinstance(self.hash_table[index], self._Node):
             self.hash_table[index].value = value
         else:
             self.hash_table[index] = self._Node(key, key_hash, value)
@@ -52,26 +54,26 @@ class Dictionary:
             if self.length / self.capacity >= self.load_factor:
                 self._resize()
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: Hashable) -> Any:
         key_hash = hash(key)
         index = self._find_slot(key, key_hash)
-        if self.hash_table[index] is not None:
+        if isinstance(self.hash_table[index], self._Node):
             return self.hash_table[index].value
         else:
-            raise KeyError(key)
+            raise KeyError(f"Key not found: {key}")
 
     def __len__(self) -> int:
         return self.length
 
-    def __delitem__(self, key: str) -> None:
+    def __delitem__(self, key: Hashable) -> None:
         key_hash = hash(key)
         index = self._find_slot(key, key_hash)
-        if self.hash_table[index] is None:
-            raise KeyError(key)
-        self.hash_table[index] = None
+        if not isinstance(self.hash_table[index], self._Node):
+            raise KeyError(f"Key not found: {key}")
+        self.hash_table[index] = self._Tombstone()
         self.length -= 1
 
-    def __iter__(self) -> str:
+    def __iter__(self) -> Iterator[Hashable]:
         for node in self.hash_table:
-            if node is not None:
+            if isinstance(node, self._Node):
                 yield node.key
