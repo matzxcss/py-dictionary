@@ -2,14 +2,13 @@ from typing import Any, Hashable, Iterator
 
 
 class Dictionary:
+    _TOMBSTONE = object()
+
     class _Node:
         def __init__(self, key: Hashable, hash_value: int, value: Any) -> None:
             self.key = key
             self.hash = hash_value
             self.value = value
-
-    class _Tombstone:
-        pass
 
     def __init__(self) -> None:
         self.capacity = 8
@@ -19,18 +18,19 @@ class Dictionary:
 
     def _find_slot(self, key: Hashable, key_hash: int) -> int:
         index = key_hash % self.capacity
-        start_index = index
+        first_tombstone = None
+
         while self.hash_table[index] is not None:
-            if (
-                isinstance(self.hash_table[index], self._Node)
-                and self.hash_table[index].key == key
-                and self.hash_table[index].hash == key_hash
-            ):
-                return index
+            node = self.hash_table[index]
+            if isinstance(node, self._Node):
+                if node.hash == key_hash and node.key == key:
+                    return index
+            elif node is self._TOMBSTONE:
+                if first_tombstone is None:
+                    first_tombstone = index
+
             index = (index + 1) % self.capacity
-            if index == start_index:
-                break
-        return index
+        return first_tombstone if first_tombstone is not None else index
 
     def _resize(self) -> None:
         old_table = self.hash_table
@@ -70,7 +70,7 @@ class Dictionary:
         index = self._find_slot(key, key_hash)
         if not isinstance(self.hash_table[index], self._Node):
             raise KeyError(f"Key not found: {key}")
-        self.hash_table[index] = self._Tombstone()
+        self.hash_table[index] = self._TOMBSTONE
         self.length -= 1
 
     def __iter__(self) -> Iterator[Hashable]:
