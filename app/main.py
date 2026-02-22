@@ -19,16 +19,18 @@ class Dictionary:
     def _find_slot(self, key: Hashable, key_hash: int) -> int:
         index = key_hash % self.capacity
         first_tombstone = None
-
-        while self.hash_table[index] is not None:
+        for _ in range(self.capacity):
             node = self.hash_table[index]
+            if node is None:
+                return (
+                    first_tombstone if first_tombstone is not None else index
+                )
             if isinstance(node, self._Node):
-                if node.hash == key_hash and node.key == key:
+                if node.key == key:
                     return index
             elif node is self._TOMBSTONE:
                 if first_tombstone is None:
                     first_tombstone = index
-
             index = (index + 1) % self.capacity
         return first_tombstone if first_tombstone is not None else index
 
@@ -39,19 +41,27 @@ class Dictionary:
         for node in old_table:
             if isinstance(node, self._Node):
                 index = node.hash % self.capacity
-                while self.hash_table[index] is not None:
+                for _ in range(self.capacity):
+                    if self.hash_table[index] is None:
+                        self.hash_table[index] = node
+                        break
                     index = (index + 1) % self.capacity
-                self.hash_table[index] = node
+            elif node is self._TOMBSTONE:
+                continue
+            else:
+                raise RuntimeError("Hash table contains invalid data")
 
     def __setitem__(self, key: Hashable, value: Any) -> None:
         key_hash = hash(key)
         index = self._find_slot(key, key_hash)
-        if isinstance(self.hash_table[index], self._Node):
-            self.hash_table[index].value = value
+        slot_content = self.hash_table[index]
+
+        if isinstance(slot_content, self._Node):
+            slot_content.value = value
         else:
             self.hash_table[index] = self._Node(key, key_hash, value)
             self.length += 1
-            if self.length / self.capacity >= self.load_factor:
+            if self.length >= self.capacity * self.load_factor:
                 self._resize()
 
     def __getitem__(self, key: Hashable) -> Any:
@@ -59,8 +69,10 @@ class Dictionary:
         index = self._find_slot(key, key_hash)
         if isinstance(self.hash_table[index], self._Node):
             return self.hash_table[index].value
-        else:
+        elif self.hash_table[index] is self._TOMBSTONE:
             raise KeyError(f"Key not found: {key}")
+        else:
+            raise RuntimeError("Hash table contains invalid data")
 
     def __len__(self) -> int:
         return self.length
